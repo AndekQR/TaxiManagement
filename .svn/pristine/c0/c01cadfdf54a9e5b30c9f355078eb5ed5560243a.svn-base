@@ -1,0 +1,230 @@
+package klient.controllers;
+
+import com.lynden.gmapsfx.GoogleMapView;
+import com.lynden.gmapsfx.MapComponentInitializedListener;
+import com.lynden.gmapsfx.javascript.object.GoogleMap;
+import com.lynden.gmapsfx.javascript.object.LatLong;
+import com.lynden.gmapsfx.javascript.object.MapOptions;
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.Pane;
+import klient.Przejazd;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.text.DecimalFormat;
+import java.time.Instant;
+
+import static com.lynden.gmapsfx.javascript.object.MapTypeIdEnum.ROADMAP;
+
+public class ControlMainPanel implements MapComponentInitializedListener {
+
+    private ViewManager manager;
+    private ObjectInputStream objectInputStream = null;
+    private ObjectOutputStream objectOutputStream = null;
+    private final static String KEY = "AIzaSyCTG9ziQFOt1ZxlPxMtzr_7T1zTCNFAmMo";
+
+    private Przejazd aktualnyPrzejazd = null;
+
+    @FXML TextField name;
+    @FXML GoogleMapView mapView;
+    @FXML Pane nowyPrzejazdPane;
+    @FXML Pane nowyDowozPane;
+    @FXML Pane historiaPane;
+    @FXML Pane edytujPane;
+    @FXML Pane anulujPane;
+    @FXML Label kmPrzejazd;
+    @FXML Label cenaPrzejazd;
+    @FXML TextField from;
+    @FXML TextField to;
+
+    @FXML
+    private void nowyPrzejazdHandle() {
+        nowyPrzejazdPane.setVisible(true);
+        nowyDowozPane.setVisible(false);
+        historiaPane.setVisible(false);
+        edytujPane.setVisible(false);
+        anulujPane.setVisible(false);
+    }
+
+    @FXML
+    private void nowyDowozHandle()
+    {
+        nowyPrzejazdPane.setVisible(false);
+        nowyDowozPane.setVisible(true);
+        historiaPane.setVisible(false);
+        edytujPane.setVisible(false);
+        anulujPane.setVisible(false);
+    }
+
+    @FXML
+    private void edytujPrzejazdHandle() {
+        nowyPrzejazdPane.setVisible(false);
+        nowyDowozPane.setVisible(false);
+        historiaPane.setVisible(false);
+        edytujPane.setVisible(true);
+        anulujPane.setVisible(false);
+    }
+
+    @FXML
+    private void anulujPrzejazdHandle() {
+        nowyPrzejazdPane.setVisible(false);
+        nowyDowozPane.setVisible(false);
+        historiaPane.setVisible(false);
+        edytujPane.setVisible(false);
+        anulujPane.setVisible(true);
+    }
+
+    @FXML
+    private void historiaHandle() {
+        nowyPrzejazdPane.setVisible(false);
+        nowyDowozPane.setVisible(false);
+        historiaPane.setVisible(true);
+        edytujPane.setVisible(false);
+        anulujPane.setVisible(false);
+    }
+
+    @FXML
+    private void wylogujHandle(){
+        manager.showLoginPanel();
+    }
+
+    @FXML
+    private void sprawdzPrzejazdHandle(){
+        Przejazd przejazd = new Przejazd(from.getText(), to.getText(), Instant.now().toString(), manager);
+        aktualnyPrzejazd = przejazd;
+        try {
+            przejazd.przelicz();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        DecimalFormat decimalFormat = new DecimalFormat("#.##");
+
+        Long distanceKM = przejazd.getM()/1000;
+        String distanceToShow = decimalFormat.format(distanceKM);
+
+        Double price = przejazd.getPrice();
+        String priceToShow = decimalFormat.format(price);
+
+        cenaPrzejazd.setText(priceToShow + " zł");
+        kmPrzejazd.setText(distanceToShow + " km");
+    }
+
+    @FXML
+    private void zarezerwujPrzejazd(){
+
+    }
+
+
+    public void setManager(ViewManager manager) {
+        this.manager=manager;
+    }
+
+    private void setHeaderName() throws IOException, ClassNotFoundException {
+        String[] order = {manager.HEADER_NAME};
+        objectOutputStream.writeObject(order);
+
+        String[] result=null;
+        while ((result=(String[]) objectInputStream.readObject()) != null) {
+            if (result[0].startsWith(manager.HEADER_NAME) && result[1].startsWith(manager.SUCCESS)) {
+                name.setText(result[2]);
+                break;
+            } else if (result[0].startsWith(manager.HEADER_NAME) && result[1].startsWith(manager.FAIL)) {
+                name.setText("Error");
+                break;
+            }
+        }
+        return;
+    }
+
+    private String[] getClientHomeLocation() throws IOException, ClassNotFoundException {
+        String[] order = {manager.CLIENT_HOME};
+        objectOutputStream.writeObject(order);
+
+
+        String[] result=null;
+        while ((result=(String[]) objectInputStream.readObject()) != null) {
+            if (result[0].startsWith(manager.CLIENT_HOME) && result[1].startsWith(manager.SUCCESS)) {
+                return result;
+            } else if (result[0].startsWith(manager.CLIENT_HOME) && result[1].startsWith(manager.FAIL)) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+
+
+
+    public void init() {
+        //mapView.setKey(KEY);
+        //mapView.addMapInializedListener(this);
+
+
+        if (objectOutputStream == null || objectInputStream == null){
+            objectInputStream = manager.getObjectInputStream();
+            objectOutputStream = manager.getObjectOutputStream();
+        }
+
+        Runnable myRunnable = () -> {
+            try {
+                this.setHeaderName();
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        };
+        Thread thread = new Thread(myRunnable);
+        thread.start();
+
+
+
+    }
+
+    @Override
+    public void mapInitialized() {
+        MapOptions options = new MapOptions();
+
+
+        /**
+         * //zamiast Runnable nazwa = () bo jest tutaj aktualizowany interfejs aplikacji javyFX
+         * Platform.runLater mówie aplikacji że może wykonać ten kawałek kodu gdy bedzie miała 'chwilę czasu'
+         * inaczej w tym miejscu aplikacja zatrzymałaby się, ponieważ musi czekać na odpoiwedź od serwera
+         *
+         * Do wyświetlania mapy używany jest GMapsFX framwork, a po stronie serwera do obliczeń client google maps**/
+        Platform.runLater(()->{
+            String[] result = null;
+            try {
+                result = getClientHomeLocation();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+
+            Double latitude = Double.valueOf(result[2]);
+            Double longitude = Double.valueOf(result[3]);
+            options.center(new LatLong(latitude, longitude))
+                    .mapType(ROADMAP)
+                    .overviewMapControl(false)
+                    .panControl(false)
+                    .rotateControl(false)
+                    .scaleControl(false)
+                    .streetViewControl(false)
+                    .zoomControl(false)
+                    .mapTypeControl(false)
+                    .zoom(14);
+
+
+            GoogleMap map = mapView.createMap(options);
+        });
+
+
+
+    }
+}

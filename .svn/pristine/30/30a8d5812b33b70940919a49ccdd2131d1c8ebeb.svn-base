@@ -1,0 +1,189 @@
+package server;
+
+import java.sql.*;
+
+public class DataBase {
+
+    private Connection connect=null;
+    private Statement statement=null;
+    private PreparedStatement preparedStatement=null;
+    private ResultSet resultSet=null;
+
+    private int howManyRows(ResultSet result) throws SQLException {
+        int count = 0;
+        while(result.next()){
+            count++;
+        }
+
+        return count;
+    }
+
+    public synchronized boolean createAccount(String[] data){ //register, name, lastname, email, password, city, street, houseNumber, apartmentNumber, bankAccount
+        for (int i=1; i<data.length; i++) {//od 1 bo w 0 jest komunikat REGISTER
+            if (data[i].length() == 0)
+                return false;
+        }
+
+            try {
+                preparedStatement = connect.prepareStatement("SELECT * FROM KLIENCI WHERE email = ? AND haslo=?");
+                preparedStatement.setString(1, data[3]);
+                preparedStatement.setString(2, data[4]);
+                resultSet = preparedStatement.executeQuery();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+
+            int returnedRows=0;
+
+            try {
+                returnedRows = this.howManyRows(resultSet);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+
+            if (returnedRows >= 1) //czy w bazie istnieje juz takie konto
+                return false;
+            else{
+                try {
+                    preparedStatement = connect.prepareStatement("INSERT INTO OSOBY (IMIE, NAZWISKO, MIASTO, ULICA, NRDOMU, NRMIESZKANIA, KONTO, OSTRZEZENIA) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", new String[]{"ID"});
+                    preparedStatement.setString(1, data[1]);//register, name, lastname, email, password, city, street, houseNumber, apartmentNumber, bankAccount
+                    preparedStatement.setString(2, data[2]);
+                    preparedStatement.setString(3, data[5]);
+                    preparedStatement.setString(4, data[6]);
+                    preparedStatement.setString(5, data[7]);
+                    preparedStatement.setInt(6, Integer.parseInt(data[8]));
+                    preparedStatement.setLong(7, Long.parseLong(data[9]));
+                    preparedStatement.setInt(8, 0);//warning level jest domyslnie ustawiany na 0
+
+
+                    int result = preparedStatement.executeUpdate();
+                    if(result == 0)
+                        return false;
+
+
+                    int idOfOsoby = 0;
+                    ResultSet generatedKey = preparedStatement.getGeneratedKeys();
+                    if(generatedKey.next()){
+                        System.out.println(generatedKey.getString(1));
+                        idOfOsoby = generatedKey.getInt(1);
+                    }
+
+                    if (idOfOsoby == 0)
+                        return false;
+
+                    preparedStatement = connect.prepareStatement("INSERT INTO KLIENCI (ID_OSOBY, EMAIL, HASLO) VALUES (?,?,?)");
+                    preparedStatement.setInt(1, idOfOsoby);
+                    preparedStatement.setString(2, data[3]);
+                    preparedStatement.setString(3, data[4]);
+
+                    preparedStatement.executeUpdate();
+
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    return false;
+                }
+
+                return true;
+            }
+    }
+
+    public synchronized String getName(String login, String password) throws SQLException {
+        try {
+            preparedStatement = connect.prepareStatement("SELECT imie, nazwisko FROM OSOBY, KLIENCI WHERE email = ? AND haslo=? AND OSOBY.ID=KLIENCI.ID_OSOBY");
+            preparedStatement.setString(1, login);
+            preparedStatement.setString(2, password);
+            resultSet = preparedStatement.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        String result="";
+
+        while (resultSet.next()){
+            result = resultSet.getString("IMIE") + " "+resultSet.getString("NAZWISKO");
+        }
+
+        return result;
+    }
+
+    public synchronized String[] getClientHomeLocation(String login, String password) throws SQLException {
+        try {
+            preparedStatement = connect.prepareStatement("SELECT MIASTO, ULICA FROM OSOBY, KLIENCI WHERE email = ? AND HASLO=? AND OSOBY.ID=KLIENCI.ID_OSOBY");
+            preparedStatement.setString(1, login);
+            preparedStatement.setString(2, password);
+            resultSet = preparedStatement.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        String[] result = new String[2];
+
+        while (resultSet.next()){
+            result[0] = resultSet.getString("MIASTO");
+            result[1] = resultSet.getString("ULICA");
+        }
+
+        return result;
+    }
+
+
+    //sprawdzanie czy konto z passaim podanymi na ekranie logowania istnieje
+    public synchronized boolean isAccount(String login, String password){
+        if (login.length()==0 || password.length()==0)
+            return false;
+        try {
+            preparedStatement = connect.prepareStatement("SELECT * FROM KLIENCI WHERE email = ? AND haslo=?");
+            preparedStatement.setString(1, login);
+            preparedStatement.setString(2, password);
+            resultSet = preparedStatement.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        int rows = 0;
+        try {
+            rows = this.howManyRows(resultSet);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        if (rows == 1)
+            return true;
+        else
+            return false;
+
+    }
+
+    public void conectToDataBase() {
+        try {
+            connect=DriverManager.getConnection("jdbc:oracle:thin:@localhost:1521:taxiDB", "admin", "admin");  //gdy wyskoczy timeZone excpetion to wykonaj skrypt sql 'SET GLOBAL time_zone = '+1:00';'
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+        }
+    }
+
+
+    public void close() {
+        System.out.println("baza danych zamykanie");
+        try {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+
+            if (statement != null) {
+                statement.close();
+            }
+
+            if (connect != null) {
+                connect.close();
+            }
+
+            if (preparedStatement != null)
+                preparedStatement.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+}

@@ -1,0 +1,59 @@
+package klient;
+
+import klient.controllers.ViewManager;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
+public class Przejazd {
+    private String odbior;
+    private String cel;
+    private String czasRozpoczacia;
+    private ViewManager manager;
+    private ObjectInputStream objectInputStream = null;
+    private ObjectOutputStream objectOutputStream = null;
+
+    Double price;
+    Long km;
+
+    public Double getPrice(){
+        return price;
+    }
+
+    public Long getM(){
+        return km;
+    }
+
+
+    public Przejazd(String odbior, String cel, String czasRozpoczacia, ViewManager manager){
+        this.odbior = odbior;
+        this.cel = cel;
+        this.czasRozpoczacia = czasRozpoczacia;
+        this.manager = manager;
+
+        objectInputStream = manager.getObjectInputStream();
+        objectOutputStream = manager.getObjectOutputStream();
+    }
+
+    public void przelicz() throws IOException, ClassNotFoundException {
+        String[] order = {manager.PRICE, odbior, cel};
+        objectOutputStream.writeObject(order);
+
+
+        String[] result=null;
+        while ((result=(String[]) objectInputStream.readObject()) != null) {
+            if (result[0].startsWith(manager.PRICE) && result[1].startsWith(manager.SUCCESS)) {
+                price = Double.valueOf(result[3]);
+                km = Long.valueOf(result[2]);
+                break;
+            } else if (result[0].startsWith(manager.PRICE) && result[1].startsWith(manager.FAIL)) {
+                System.err.println("Przejazd: result = fail PRICE");
+                break;
+            }
+        }
+
+    }
+
+
+}
