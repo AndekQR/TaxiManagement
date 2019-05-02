@@ -1,4 +1,0 @@
-mvn install:install-file -Dfile=ojdbc8.jar -DgroupId=com.oracle -DartifactId=ojdbc8 -Dversion=18.3 -Dpackaging=jar
-
-
-mvn install:install-file -Dfile=jfxtras-all-10.0-r1.jar -DgroupId=org.jfxtras -DartifactId=jfxtras-all -Dversion=10.0 -Dpackaging=jar
