@@ -40,3 +40,5 @@ release.properties
 *.iws
 out/
 .idea_modules/
+.idea/
+.svn/
