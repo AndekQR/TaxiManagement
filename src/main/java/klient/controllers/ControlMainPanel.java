@@ -36,7 +36,7 @@ public class ControlMainPanel implements MapComponentInitializedListener {
     private ViewManager manager;
     private ObjectInputStream objectInputStream = null;
     private ObjectOutputStream objectOutputStream = null;
-    private final static String KEY = "AIzaSyCTG9ziQFOt1ZxlPxMtzr_7T1zTCNFAmMo";
+    private final static String KEY = "YOUR_KEY";
 
     private Przejazd aktualnyPrzejazd = null;
 
